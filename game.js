@@ -1,16 +1,21 @@
 /* === Config === */
-const SIZE = 8;                 // поле NxN
-const TYPES = [1,2,3,4,5,6];    // соответствуют 1.png ... 6.png в корне
+const SIZE = 8;                     // поле NxN
+const TYPES = [1,2,3,4,5,6];        // соответствуют 1.png ... 6.png в корне
 const SCORE_PER_TILE = 10;
-const STAR_REFILL_CHANCE = 0.04; // шанс появления звезды при доливе
+const STAR_REFILL_CHANCE = 0.04;    // шанс появления звезды при доливе
+const DRAG_THRESHOLD = 16;          // пикселей для определения направления
 
 /* === State === */
-let grid = [];                   // 2D: {type:number, star:boolean} | null
+let grid = [];                      // 2D: {type:number, star:boolean} | null
 let score = 0, moves = 0;
 let starInventory = 0;
 let starArmed = false;
-let selected = null;             // {r,c}
-let historyState = null;         // для rewind
+let selected = null;                // {r,c}
+let historyState = null;            // для rewind
+
+/* Drag state */
+let dragStart = null;               // {r,c, x, y}
+let dragging = false;
 
 /* === DOM === */
 const gridEl  = document.getElementById('grid');
@@ -22,15 +27,25 @@ const toastEl = document.getElementById('toast');
 
 /* === Utils === */
 const rand = n => Math.floor(Math.random()*n);
-const inside = (r,c) => r>=0 && c>=0 && r<SIZE && c<SIZE;
 const delay = ms => new Promise(res=>setTimeout(res, ms));
+function showToast(msg, ms=1400){ toastEl.textContent = msg; toastEl.classList.add('show'); setTimeout(()=>toastEl.classList.remove('show'), ms); }
+function neighbors(a,b){ return (a.r===b.r && Math.abs(a.c-b.c)===1) || (a.c===b.c && Math.abs(a.r-b.r)===1); }
 
-function showToast(msg, ms=1400){
-  toastEl.textContent = msg; toastEl.classList.add('show');
-  setTimeout(()=>toastEl.classList.remove('show'), ms);
+/* Цвет рамки по типу */
+function borderForType(type, isStar=false){
+  if(isStar) return '#fbbf24'; // золото
+  const map = {
+    1:'#60a5fa', // blue-400
+    2:'#34d399', // emerald-400
+    3:'#f59e0b', // amber-500
+    4:'#f87171', // red-400
+    5:'#a78bfa', // violet-400
+    6:'#22d3ee'  // cyan-400
+  };
+  return map[type] || '#94a3b8';
 }
 
-/* === Background particles === */
+/* === Fancy BG === */
 (() => {
   const c = document.getElementById('bgfx');
   const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -84,34 +99,33 @@ function buildGrid(){
   }
 }
 
-function imgPath(x){ return `${x}.png`; }            // 1.png … 6.png
-function starPath(){ return `bonus.png`; }           // бонус
-function rewindPath(){ return `rewind.png`; }        // просто для ссылки, не обяз.
+function candidatePaths(base){ return [`${base}.png`, `${base}.PNG`, `${base}.Png`]; }
+function setImgWithFallback(imgEl, base, isStar=false){
+  const paths = isStar ? ['bonus.png','bonus.PNG','bonus.Png'] : candidatePaths(base);
+  let i = 0;
+  imgEl.onerror = () => { i++; if(i < paths.length) imgEl.src = paths[i]; };
+  imgEl.src = paths[i];
+}
 
 function renderTile(r,c){
-  const el = gridEl.children[r*SIZE+c].firstChild;
+  const el = gridEl.children[r*SIZE+c].firstChild; // .tile
   const t = grid[r][c];
   el.classList.toggle('selected', !!selected && selected.r===r && selected.c===c);
-  if(!t){ el.innerHTML=''; return; }
-  el.innerHTML = `<img src="${t.star ? starPath() : imgPath(t.type)}" alt="">`;
+  if(!t){ el.innerHTML=''; el.style.borderColor='transparent'; return; }
+  el.innerHTML = `<img alt="">`;
+  const img = el.querySelector('img');
+  if (t.star) setImgWithFallback(img, 'bonus', true);
+  else setImgWithFallback(img, String(t.type));
+  el.style.borderColor = borderForType(t.type, t.star);
 }
 
-function renderAll(){
-  for(let r=0;r<SIZE;r++) for(let c=0;c<SIZE;c++) renderTile(r,c);
-}
-
-function updateHUD(){
-  scoreEl.textContent = score;
-  movesEl.textContent = moves;
-  starCountEl.textContent = starInventory;
-  starEl.classList.toggle('active', starArmed);
-}
-
-function randomTile(){ return { type: [1,2,3,4,5,6][rand(6)], star:false }; }
+function renderAll(){ for(let r=0;r<SIZE;r++) for(let c=0;c<SIZE;c++) renderTile(r,c); }
+function updateHUD(){ scoreEl.textContent=score; movesEl.textContent=moves; starCountEl.textContent=starInventory; starEl.classList.toggle('active', starArmed); }
+function randomTile(){ return { type: TYPES[rand(TYPES.length)], star:false }; }
 
 function initGrid(){
   grid = Array.from({length: SIZE}, () => Array.from({length: SIZE}, randomTile));
-  while(findMatches().length) shuffleBoard(); // чтобы без стартовых совпадений
+  while(findMatches().length) shuffleBoard(); // без стартовых матчей
 }
 
 function shuffleBoard(){
@@ -181,17 +195,98 @@ async function gravityAndRefill(){
     }
     for(let r=write;r>=0;r--){
       const spawnStar = Math.random() < STAR_REFILL_CHANCE;
-      grid[r][c] = spawnStar ? {type:[1,2,3,4,5,6][rand(6)], star:true} : randomTile();
+      grid[r][c] = spawnStar ? {type:TYPES[rand(TYPES.length)], star:true} : randomTile();
     }
   }
   await delay(120);
 }
 
-function neighbors(a,b){ return (a.r===b.r && Math.abs(a.c-b.c)===1) || (a.c===b.c && Math.abs(a.r-b.r)===1); }
-function deselect(){ selected=null; }
+/* === Drag & Drop (mouse + touch) === */
+function getRCFromEvent(e){
+  const tileEl = e.target.closest('.tile'); if(!tileEl) return null;
+  return { r:+tileEl.dataset.r, c:+tileEl.dataset.c, el:tileEl };
+}
 
-/* === Input === */
+function onPointerDown(clientX, clientY, rc){
+  dragStart = { r:rc.r, c:rc.c, x:clientX, y:clientY };
+  dragging = true;
+  selected = { r:rc.r, c:rc.c };
+  renderTile(rc.r, rc.c);
+}
+
+function onPointerMove(clientX, clientY){
+  if(!dragging || !dragStart) return;
+  const dx = clientX - dragStart.x;
+  const dy = clientY - dragStart.y;
+  if(Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
+
+  let target = null;
+  if(Math.abs(dx) > Math.abs(dy)){
+    // горизонтальный
+    target = { r: dragStart.r, c: dragStart.c + (dx>0?1:-1) };
+  }else{
+    // вертикальный
+    target = { r: dragStart.r + (dy>0?1:-1), c: dragStart.c };
+  }
+  if(target && target.r>=0 && target.c>=0 && target.r<SIZE && target.c<SIZE){
+    doSwapByDrag(dragStart, target);
+  }
+  dragStart = null; dragging = false;
+}
+
+async function doSwapByDrag(a,b){
+  // режим звезды — игнор перетягивания
+  if(starArmed) return;
+
+  // звёздную плитку при перетаскивании собираем?
+  const tA = grid[a.r][a.c], tB = grid[b.r][b.c];
+  if(tA && tA.star){ starInventory++; grid[a.r][a.c] = randomTile(); updateHUD(); renderTile(a.r,a.c); showToast('⭐ В инвентаре'); return; }
+  if(tB && tB.star){ starInventory++; grid[b.r][b.c] = randomTile(); updateHUD(); renderTile(b.r,b.c); showToast('⭐ В инвентаре'); return; }
+
+  snapshot();
+  swap(a,b);
+  renderTile(a.r,a.c); renderTile(b.r,b.c);
+
+  const m = findMatches();
+  if(!m.length){
+    await delay(100);
+    swap(a,b);
+    renderTile(a.r,a.c); renderTile(b.r,b.c);
+    selected = null;
+    return;
+  }
+  moves++; updateHUD(); selected = null; await crush(m);
+}
+
+function onPointerUp(){
+  dragging = false; dragStart = null;
+}
+
+/* Mouse */
+gridEl.addEventListener('mousedown', (e)=>{
+  const rc = getRCFromEvent(e); if(!rc) return;
+  // если активирована звезда — кликом, не перетягиванием
+  if(starArmed) return;
+  onPointerDown(e.clientX, e.clientY, rc);
+});
+window.addEventListener('mousemove', (e)=> onPointerMove(e.clientX, e.clientY));
+window.addEventListener('mouseup', onPointerUp);
+
+/* Touch */
+gridEl.addEventListener('touchstart', (e)=>{
+  const t = e.changedTouches[0]; const rc = getRCFromEvent(e); if(!rc) return;
+  if(starArmed) return; // звезда: только тап
+  onPointerDown(t.clientX, t.clientY, rc);
+},{passive:true});
+gridEl.addEventListener('touchmove', (e)=>{
+  const t = e.changedTouches[0]; onPointerMove(t.clientX, t.clientY);
+},{passive:true});
+gridEl.addEventListener('touchend', onPointerUp, {passive:true});
+
+/* === Click interactions (звезда, клик по клетке) === */
 gridEl.addEventListener('click', async (e)=>{
+  // если был драг — не обрабатываем click повторно
+  if(dragging) return;
   const tileEl = e.target.closest('.tile'); if(!tileEl) return;
   const r = +tileEl.dataset.r, c = +tileEl.dataset.c;
   const t = grid[r][c];
@@ -200,23 +295,15 @@ gridEl.addEventListener('click', async (e)=>{
     if(t && t.star){ showToast('Выбери обычную плитку'); return; }
     useStarOnType(t.type); return;
   }
+
+  // клик по звезде на поле = подобрать в инвентарь
   if(t && t.star){
-    starInventory++; grid[r][c]=randomTile(); renderTile(r,c); updateHUD(); showToast('⭐ В инвентаре');
+    starInventory++; grid[r][c] = randomTile(); renderTile(r,c); updateHUD(); showToast('⭐ В инвентаре');
     return;
   }
 
-  if(!selected){ selected={r,c}; renderTile(r,c); return; }
-  const b={r,c};
-  if(selected.r===r && selected.c===c){ deselect(); renderTile(r,c); return; }
-  if(!neighbors(selected,b)){ selected={r,c}; renderAll(); return; }
-
-  snapshot();
-  swap(selected,b); renderTile(selected.r,selected.c); renderTile(r,c);
-  const m=findMatches();
-  if(!m.length){
-    await delay(120); swap(selected,b); renderTile(selected.r,selected.c); renderTile(r,c); deselect(); return;
-  }
-  moves++; updateHUD(); deselect(); await crush(m);
+  // одиночный клик — просто подсветка
+  selected = {r,c}; renderTile(r,c);
 });
 
 function swap(a,b){ const tmp=grid[a.r][a.c]; grid[a.r][a.c]=grid[b.r][b.c]; grid[b.r][b.c]=tmp; }
