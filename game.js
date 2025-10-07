@@ -1,6 +1,6 @@
 /* === Config === */
 const SIZE = 8;                     // поле NxN
-const TYPES = [1,2,3,4,5,6];        // соответствуют 1.png ... 6.png в корне
+const TYPES = [1,2,3,4,5,6];        // 1.png ... 6.png в корне
 const SCORE_PER_TILE = 10;
 const STAR_REFILL_CHANCE = 0.04;    // шанс появления звезды при доливе
 const DRAG_THRESHOLD = 16;          // пикселей для определения направления
@@ -16,6 +16,7 @@ let historyState = null;            // для rewind
 /* Drag state */
 let dragStart = null;               // {r,c, x, y}
 let dragging = false;
+let suppressNextClick = false;      // чтобы клик не срабатывал сразу после драга
 
 /* === DOM === */
 const gridEl  = document.getElementById('grid');
@@ -112,7 +113,7 @@ function renderTile(r,c){
   const t = grid[r][c];
   el.classList.toggle('selected', !!selected && selected.r===r && selected.c===c);
   if(!t){ el.innerHTML=''; el.style.borderColor='transparent'; return; }
-  el.innerHTML = `<img alt="">`;
+  if(!el.firstChild) el.innerHTML = `<img alt="">`;
   const img = el.querySelector('img');
   if (t.star) setImgWithFallback(img, 'bonus', true);
   else setImgWithFallback(img, String(t.type));
@@ -122,6 +123,14 @@ function renderTile(r,c){
 function renderAll(){ for(let r=0;r<SIZE;r++) for(let c=0;c<SIZE;c++) renderTile(r,c); }
 function updateHUD(){ scoreEl.textContent=score; movesEl.textContent=moves; starCountEl.textContent=starInventory; starEl.classList.toggle('active', starArmed); }
 function randomTile(){ return { type: TYPES[rand(TYPES.length)], star:false }; }
+
+/* Аккуратное управление выделением — всегда ОДНА плитка */
+function setSelected(pos){
+  const prev = selected;
+  selected = pos;
+  if(prev) renderTile(prev.r, prev.c);
+  if(pos) renderTile(pos.r, pos.c);
+}
 
 function initGrid(){
   grid = Array.from({length: SIZE}, () => Array.from({length: SIZE}, randomTile));
@@ -139,7 +148,7 @@ function restore(){
   if(!historyState) return;
   const s = JSON.parse(historyState);
   grid=s.grid; score=s.score; moves=s.moves; starInventory=s.starInventory;
-  selected=null; starArmed=false; updateHUD(); renderAll();
+  setSelected(null); starArmed=false; updateHUD(); renderAll();
 }
 
 /* === Matches === */
@@ -201,44 +210,11 @@ async function gravityAndRefill(){
   await delay(120);
 }
 
-/* === Drag & Drop (mouse + touch) === */
-function getRCFromEvent(e){
-  const tileEl = e.target.closest('.tile'); if(!tileEl) return null;
-  return { r:+tileEl.dataset.r, c:+tileEl.dataset.c, el:tileEl };
-}
+/* === Общая попытка обмена (для клика и драга) === */
+async function attemptSwap(a,b){
+  if(!neighbors(a,b)) return;
 
-function onPointerDown(clientX, clientY, rc){
-  dragStart = { r:rc.r, c:rc.c, x:clientX, y:clientY };
-  dragging = true;
-  selected = { r:rc.r, c:rc.c };
-  renderTile(rc.r, rc.c);
-}
-
-function onPointerMove(clientX, clientY){
-  if(!dragging || !dragStart) return;
-  const dx = clientX - dragStart.x;
-  const dy = clientY - dragStart.y;
-  if(Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
-
-  let target = null;
-  if(Math.abs(dx) > Math.abs(dy)){
-    // горизонтальный
-    target = { r: dragStart.r, c: dragStart.c + (dx>0?1:-1) };
-  }else{
-    // вертикальный
-    target = { r: dragStart.r + (dy>0?1:-1), c: dragStart.c };
-  }
-  if(target && target.r>=0 && target.c>=0 && target.r<SIZE && target.c<SIZE){
-    doSwapByDrag(dragStart, target);
-  }
-  dragStart = null; dragging = false;
-}
-
-async function doSwapByDrag(a,b){
-  // режим звезды — игнор перетягивания
-  if(starArmed) return;
-
-  // звёздную плитку при перетаскивании собираем?
+  // если в обмене участвует звезда — просто подбор в инвентарь
   const tA = grid[a.r][a.c], tB = grid[b.r][b.c];
   if(tA && tA.star){ starInventory++; grid[a.r][a.c] = randomTile(); updateHUD(); renderTile(a.r,a.c); showToast('⭐ В инвентаре'); return; }
   if(tB && tB.star){ starInventory++; grid[b.r][b.c] = randomTile(); updateHUD(); renderTile(b.r,b.c); showToast('⭐ В инвентаре'); return; }
@@ -252,41 +228,84 @@ async function doSwapByDrag(a,b){
     await delay(100);
     swap(a,b);
     renderTile(a.r,a.c); renderTile(b.r,b.c);
-    selected = null;
+    setSelected(null);
     return;
   }
-  moves++; updateHUD(); selected = null; await crush(m);
+  moves++; updateHUD(); setSelected(null); await crush(m);
 }
 
-function onPointerUp(){
-  dragging = false; dragStart = null;
+function swap(a,b){ const tmp=grid[a.r][a.c]; grid[a.r][a.c]=grid[b.r][b.c]; grid[b.r][b.c]=tmp; }
+
+/* === Drag & Drop (mouse + touch) === */
+function getRCFromEventTarget(target){
+  const tileEl = target.closest && target.closest('.tile');
+  if(!tileEl) return null;
+  return { r:+tileEl.dataset.r, c:+tileEl.dataset.c, el:tileEl };
 }
 
-/* Mouse */
 gridEl.addEventListener('mousedown', (e)=>{
-  const rc = getRCFromEvent(e); if(!rc) return;
-  // если активирована звезда — кликом, не перетягиванием
-  if(starArmed) return;
-  onPointerDown(e.clientX, e.clientY, rc);
+  if(starArmed) return; // звезда работает по клику
+  const rc = getRCFromEventTarget(e.target); if(!rc) return;
+  dragging = true; suppressNextClick = false;
+  dragStart = { r:rc.r, c:rc.c, x:e.clientX, y:e.clientY };
+  setSelected({r:rc.r, c:rc.c});
 });
-window.addEventListener('mousemove', (e)=> onPointerMove(e.clientX, e.clientY));
-window.addEventListener('mouseup', onPointerUp);
+window.addEventListener('mousemove', (e)=>{
+  if(!dragging || !dragStart) return;
+  const dx = e.clientX - dragStart.x;
+  const dy = e.clientY - dragStart.y;
+  if(Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
+
+  let target = null;
+  if(Math.abs(dx) > Math.abs(dy)){
+    target = { r: dragStart.r, c: dragStart.c + (dx>0?1:-1) };
+  } else {
+    target = { r: dragStart.r + (dy>0?1:-1), c: dragStart.c };
+  }
+  if(target && target.r>=0 && target.c>=0 && target.r<SIZE && target.c<SIZE){
+    suppressNextClick = true;
+    attemptSwap({r:dragStart.r, c:dragStart.c}, target);
+  }
+  dragging = false; dragStart = null;
+});
+window.addEventListener('mouseup', ()=>{
+  dragging = false; dragStart = null;
+});
 
 /* Touch */
 gridEl.addEventListener('touchstart', (e)=>{
-  const t = e.changedTouches[0]; const rc = getRCFromEvent(e); if(!rc) return;
-  if(starArmed) return; // звезда: только тап
-  onPointerDown(t.clientX, t.clientY, rc);
+  if(starArmed) return;
+  const t = e.changedTouches[0];
+  const rc = getRCFromEventTarget(e.target); if(!rc) return;
+  dragging = true; suppressNextClick = false;
+  dragStart = { r:rc.r, c:rc.c, x:t.clientX, y:t.clientY };
+  setSelected({r:rc.r, c:rc.c});
 },{passive:true});
 gridEl.addEventListener('touchmove', (e)=>{
-  const t = e.changedTouches[0]; onPointerMove(t.clientX, t.clientY);
-},{passive:true});
-gridEl.addEventListener('touchend', onPointerUp, {passive:true});
+  if(!dragging || !dragStart) return;
+  const t = e.changedTouches[0];
+  const dx = t.clientX - dragStart.x;
+  const dy = t.clientY - dragStart.y;
+  if(Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
 
-/* === Click interactions (звезда, клик по клетке) === */
+  let target = null;
+  if(Math.abs(dx) > Math.abs(dy)){
+    target = { r: dragStart.r, c: dragStart.c + (dx>0?1:-1) };
+  } else {
+    target = { r: dragStart.r + (dy>0?1:-1), c: dragStart.c };
+  }
+  if(target && target.r>=0 && target.c>=0 && target.r<SIZE && target.c<SIZE){
+    suppressNextClick = true;
+    attemptSwap({r:dragStart.r, c:dragStart.c}, target);
+  }
+  dragging = false; dragStart = null;
+},{passive:true});
+gridEl.addEventListener('touchend', ()=>{ dragging=false; dragStart=null; }, {passive:true});
+
+/* === Click interactions (звезда, клик-обмен) === */
 gridEl.addEventListener('click', async (e)=>{
-  // если был драг — не обрабатываем click повторно
-  if(dragging) return;
+  if(suppressNextClick){ suppressNextClick=false; return; }
+
   const tileEl = e.target.closest('.tile'); if(!tileEl) return;
   const r = +tileEl.dataset.r, c = +tileEl.dataset.c;
   const t = grid[r][c];
@@ -302,23 +321,15 @@ gridEl.addEventListener('click', async (e)=>{
     return;
   }
 
-  // одиночный клик — просто подсветка
-  selected = {r,c}; renderTile(r,c);
+  // клик-обмен: если нет выбранной — выделяем; если сосед — пытаемся обменять; если не сосед — переназначаем выделение
+  if(!selected){ setSelected({r,c}); return; }
+  if(selected.r===r && selected.c===c){ setSelected(null); return; }
+  if(neighbors(selected, {r,c})){
+    await attemptSwap(selected, {r,c});
+    return;
+  }
+  setSelected({r,c});
 });
-
-function swap(a,b){ const tmp=grid[a.r][a.c]; grid[a.r][a.c]=grid[b.r][b.c]; grid[b.r][b.c]=tmp; }
-
-function useStarOnType(type){
-  starArmed=false; updateHUD(); let removed=0;
-  for(let r=0;r<SIZE;r++) for(let c=0;c<SIZE;c++){
-    const t=grid[r][c]; if(t && !t.star && t.type===type){ grid[r][c]=null; removed++; }
-  }
-  if(removed){
-    score += removed * SCORE_PER_TILE * 2; popConfetti();
-    showToast('⭐ Бабах! Убраны все выбранные плитки ('+removed+')');
-    updateHUD(); gravityAndRefill().then(()=>{ renderAll(); setTimeout(()=>crush(findMatches()), 100); });
-  }
-}
 
 document.getElementById('newGame').addEventListener('click', ()=> newGame());
 document.getElementById('rewind').addEventListener('click', ()=>{ historyState ? (restore(), showToast('↺ Откат к началу хода')) : showToast('Пока нечего откатывать'); });
@@ -333,9 +344,10 @@ function popConfetti(){
   const dpr=Math.min(2, window.devicePixelRatio||1);
   c.width=innerWidth*dpr; c.height=innerHeight*dpr; c.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:30';
   document.body.appendChild(c);
-  const parts=Array.from({length:140},()=>({x:Math.random()*c.width,y:-20,vy:1+dpr*Math.random()*3,vx:(-1+Math.random()*2)*dpr,s:2+dpr*Math.random()*3,a:1,hue:Math.random()*60+40}));
-  let t=0;(function anim(){ctx.clearRect(0,0,c.width,c.height);parts.forEach(p=>{p.vy+=0.03;p.y+=p.vy;p.x+=p.vx;p.a-=0.005;ctx.fillStyle=`hsla(${p.hue},95%,65%,${Math.max(0,p.a)})`;ctx.fillRect(p.x,p.y,p.s,p.s*2);});t++; if(t<260) requestAnimationFrame(anim); else c.remove();})();}
+  const parts=Array.from({length:120},()=>({x:Math.random()*c.width,y:-20,vy:1+dpr*Math.random()*3,vx:(-1+Math.random()*2)*dpr,s:2+dpr*Math.random()*3,a:1,hue:Math.random()*60+40}));
+  let t=0;(function anim(){ctx.clearRect(0,0,c.width,c.height);parts.forEach(p=>{p.vy+=0.03;p.y+=p.vy;p.x+=p.vx;p.a-=0.005;ctx.fillStyle=`hsla(${p.hue},95%,65%,${Math.max(0,p.a)})`;ctx.fillRect(p.x,p.y,p.s,p.s*2);});t++; if(t<220) requestAnimationFrame(anim); else c.remove();})();
+}
 
 /* === Game lifecycle === */
-function newGame(){ score=0;moves=0;starInventory=0;starArmed=false;selected=null;historyState=null; updateHUD(); initGrid(); buildGrid(); renderAll(); }
+function newGame(){ score=0;moves=0;starInventory=0;starArmed=false; setSelected(null); historyState=null; updateHUD(); initGrid(); buildGrid(); renderAll(); }
 buildGrid(); newGame();
