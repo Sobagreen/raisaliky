@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>raisaliky — Match-3</title>
+  <!-- прелоад картинок -->
+  <link rel="preload" href="1.png" as="image">
+  <link rel="preload" href="2.png" as="image">
+  <link rel="preload" href="3.png" as="image">
+  <link rel="preload" href="4.png" as="image">
+  <link rel="preload" href="5.png" as="image">
+  <link rel="preload" href="6.png" as="image">
+  <link rel="preload" href="bonus.png" as="image">
+  <link rel="preload" href="rewind.png" as="image">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <canvas id="bgfx" aria-hidden="true"></canvas>
+
+  <div class="wrap">
+    <aside class="panel glass">
+      <h1>🐶 raisaliky — Match-3</h1>
+      <p class="subtitle">
+        Соединяй 3+ одинаковых мордочек. Матч из 4 даёт ⭐ (в инвентарь),
+        из 5 — ⭐⭐. Нажми ⭐ → затем на тип плитки — все такие плитки исчезнут.
+      </p>
+
+      <div class="hud">
+        <div class="badge"><div class="caption">Очки</div><div class="value" id="score">0</div></div>
+        <div class="badge"><div class="caption">Ходы</div><div class="value" id="moves">0</div></div>
+      </div>
+
+      <div class="tools">
+        <button class="power" id="starPower" title="Активировать ⭐">
+          <img src="bonus.png" alt="Star bonus" />
+          <div class="power-info">
+            <b>⭐ Звёзды:</b> <span id="starCount">0</span>
+            <div class="hint">Кликни по типу плитки</div>
+          </div>
+        </button>
+
+        <button class="btn ghost" id="rewind">
+          <img src="rewind.png" alt="rewind" />
+          <span>Rewind</span>
+        </button>
+
+        <button class="btn primary" id="newGame">Новая игра</button>
+      </div>
+
+      <div class="note">Подсказка: цепочки-реакции дают +50% очков.</div>
+    </aside>
+
+    <main class="board-wrap glass">
+      <div id="grid" class="grid" role="grid" aria-label="Поле игры"></div>
+    </main>
+  </div>
+
+  <div id="toast" class="toast">Подсказка</div>
+
+  <script src="game.js"></script>
+</body>
+</html>
