@@ -1,71 +1,403 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>raisaliky — Match-3</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>raisaliky — быстрый Match-3</title>
 
-  <!-- Прелоад ключевых изображений -->
-  <link rel="preload" href="1.png" as="image">
-  <link rel="preload" href="2.png" as="image">
-  <link rel="preload" href="3.png" as="image">
-  <link rel="preload" href="4.png" as="image">
-  <link rel="preload" href="5.png" as="image">
-  <link rel="preload" href="6.png" as="image">
-  <link rel="preload" href="bonus.png" as="image">
-  <link rel="preload" href="rewind.png" as="image">
+<!-- Прелоад ключевых картинок -->
+<link rel="preload" href="1.png" as="image">
+<link rel="preload" href="2.png" as="image">
+<link rel="preload" href="3.png" as="image">
+<link rel="preload" href="4.png" as="image">
+<link rel="preload" href="5.png" as="image">
+<link rel="preload" href="6.png" as="image">
+<link rel="preload" href="bonus.png" as="image">
+<link rel="preload" href="rewind.png" as="image">
 
-  <link rel="stylesheet" href="styles.css" />
+<style>
+  :root{
+    --bg:#0b1327;
+    --panel:#0e1424cc;
+    --stroke:#243351;
+    --text:#e5e7eb;
+    --muted:#9fb1d6;
+    --tile:72px;       /* размер клетки */
+    --gap:10px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:linear-gradient(135deg,#0a1326,#09101f 55%, #070d1a);
+    color:var(--text); font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    display:flex; align-items:center; justify-content:center; padding:16px;
+  }
+  .wrap{display:grid; grid-template-columns: 320px auto; gap:16px; width:100%; max-width:1100px}
+  .panel{
+    padding:16px; border:1px solid var(--stroke); border-radius:16px; background:var(--panel);
+  }
+  h1{margin:0 0 6px; font-size:22px}
+  .subtitle{margin:0 0 10px; color:var(--muted); font-size:14px; line-height:1.4}
+  .hud{display:flex; gap:8px; margin:10px 0}
+  .badge{flex:1; display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border:1px solid var(--stroke); border-radius:12px; background:#0d1732}
+  .badge b{font-size:20px}
+  .tools{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
+  .power, .btn{
+    display:inline-flex; align-items:center; gap:8px; border:1px solid var(--stroke); background:#0d1732;
+    color:var(--text); padding:8px 10px; border-radius:10px; cursor:pointer; font-weight:700
+  }
+  .power img, .btn img{width:22px; height:22px}
+  .power.active{outline:2px dashed #fbbf24}
+  .note{color:#bfd1f8; font-size:12px; margin-top:8px}
+
+  .board{display:grid; gap:var(--gap); background:rgba(255,255,255,.04); padding:var(--gap); border-radius:16px; border:1px solid var(--stroke)}
+  .cell{width:var(--tile); height:var(--tile); border-radius:12px; display:grid; place-items:center; background:linear-gradient(180deg,#0f1a32,#0b1327)}
+  .tile{
+    width:calc(var(--tile) - 8px); height:calc(var(--tile) - 8px);
+    display:grid; place-items:center; border-radius:10px; user-select:none; cursor:pointer;
+    border:4px solid transparent; transition:transform .08s ease, border-color .12s ease;
+    will-change: transform;
+  }
+  .tile.selected{outline:3px solid #60a5fa}
+  .tile img{width:80%; height:80%; object-fit:contain}
+  .toast{
+    position:fixed; top:12px; left:50%; transform:translateX(-50%); background:#0f162bde; border:1px solid var(--stroke);
+    color:#e5e7eb; padding:8px 10px; border-radius:10px; font-size:13px; opacity:0; pointer-events:none; transition:opacity .2s ease
+  }
+  .toast.show{opacity:1}
+
+  @media (max-width: 980px){
+    .wrap{grid-template-columns: 1fr}
+    :root{ --tile:64px }
+  }
+</style>
 </head>
 <body>
-  <canvas id="bgfx" aria-hidden="true"></canvas>
 
-  <div class="wrap">
-    <aside class="panel glass">
-      <h1>🐶 raisaliky — Match-3</h1>
-      <p class="subtitle">
-        Собирай 3+ подряд. Можно <b>кликнуть</b> по соседним плиткам для обмена или <b>перетянуть</b> в сторону.
-        Матч из 4 даёт ⭐ (в инвентарь), из 5 — ⭐⭐. Нажми ⭐ → затем на тип плитки — все такие исчезнут.
-      </p>
+<div class="wrap">
+  <section class="panel">
+    <h1>🐶 raisaliky — Match-3</h1>
+    <p class="subtitle">
+      Собирай 3+ подряд. Можно <b>кликнуть</b> по соседним плиткам для обмена или <b>перетянуть</b> на соседнюю.
+      Матч из 4 даёт ⭐, из 5 — ⭐⭐. Нажми ⭐ и кликни по типу плитки — все такие исчезнут.<br>
+      <i>Звезда не порождает новые звезды.</i>
+    </p>
 
-      <div class="hud">
-        <div class="badge">
-          <div class="caption">Очки</div>
-          <div class="value" id="score">0</div>
-        </div>
-        <div class="badge">
-          <div class="caption">Ходы</div>
-          <div class="value" id="moves">0</div>
-        </div>
-      </div>
+    <div class="hud">
+      <div class="badge"><span>Очки</span><b id="score">0</b></div>
+      <div class="badge"><span>Ходы</span><b id="moves">0</b></div>
+    </div>
 
-      <div class="tools">
-        <button class="power" id="starPower" title="Активировать ⭐">
-          <img src="bonus.png" alt="Star bonus" />
-          <div class="power-info">
-            <b>⭐ Звёзды:</b> <span id="starCount">0</span>
-            <div class="hint">Кликни по типу плитки</div>
-          </div>
-        </button>
+    <div class="tools">
+      <button class="power" id="starPower" title="Активировать ⭐">
+        <img src="bonus.png" alt=""><span><b>⭐</b> <span id="starCount">0</span></span>
+      </button>
+      <button class="btn" id="rewind"><img src="rewind.png" alt=""> Rewind</button>
+      <button class="btn" id="newGame">Новая игра</button>
+    </div>
 
-        <button class="btn ghost" id="rewind">
-          <img src="rewind.png" alt="rewind" />
-          <span>Rewind</span>
-        </button>
+    <div class="note">Совет: если ход не даёт матч — он автоматически откатывается.</div>
+  </section>
 
-        <button class="btn primary" id="newGame">Новая игра</button>
-      </div>
+  <main>
+    <div id="board" class="board" aria-label="Поле"></div>
+  </main>
+</div>
 
-      <div class="note">Подсказка: цепочки-реакции дают +50% очков. Драг работает и на тач-экранах.</div>
-    </aside>
+<div id="toast" class="toast">Подсказка</div>
 
-    <main class="board-wrap glass">
-      <div id="grid" class="grid" role="grid" aria-label="Поле игры"></div>
-    </main>
-  </div>
+<script>
+/* ================== Быстрый, однофайловый движок ================== */
+/* Конфиг */
+const N = 8;                       // поле N x N
+const TYPES = [1,2,3,4,5,6];       // соответствуют 1.png … 6.png
+const SCORE_PER_TILE = 10;
+const STAR_REFILL_CHANCE = 0.00;   // шанс выпадения звезды при доливке (для скорости отключил)
+const DRAG_THRESHOLD = 14;
 
-  <div id="toast" class="toast">Подсказка</div>
+/* Состояние */
+let grid = [];                     // {type:number, star:boolean} | null
+let score=0, moves=0;
+let stars=0;
+let starArmed=false;
+let sel=null;                      // {r,c}
+let snapshotState=null;            // для rewind
+let dragging=false, dragStart=null, suppressClick=false;
+let awardStarsEnabled = true;      // флаг — когда используем ⭐, выключаем награждение звёздами
 
-  <script src="game.js"></script>
+/* DOM */
+const board = document.getElementById('board');
+const scoreEl = document.getElementById('score');
+const movesEl = document.getElementById('moves');
+const starCountEl = document.getElementById('starCount');
+const starBtn = document.getElementById('starPower');
+const toastEl = document.getElementById('toast');
+
+/* Утилиты */
+const rand = n => Math.floor(Math.random()*n);
+const delay = ms => new Promise(r=>setTimeout(r,ms));
+function toast(msg, ms=1100){ toastEl.textContent=msg; toastEl.classList.add('show'); setTimeout(()=>toastEl.classList.remove('show'), ms); }
+function inb(r,c){ return r>=0 && c>=0 && r<N && c<N; }
+function neighbors(a,b){ return (a.r===b.r && Math.abs(a.c-b.c)===1) || (a.c===b.c && Math.abs(a.r-b.r)===1); }
+
+/* Цвет рамки по типу */
+function borderFor(t, star=false){
+  if(star) return '#fbbf24';
+  return ({1:'#60a5fa',2:'#34d399',3:'#f59e0b',4:'#f87171',5:'#a78bfa',6:'#22d3ee'})[t] || '#cbd5e1';
+}
+
+/* Изображения: учитываем .png / .PNG / .Png */
+function candidatePaths(base){
+  return [`${base}.png`, `${base}.PNG`, `${base}.Png`];
+}
+function setImgFallback(img, base, isStar=false){
+  const paths = isStar ? ['bonus.png','bonus.PNG','bonus.Png'] : candidatePaths(base);
+  let i=0;
+  img.onerror = ()=>{ i++; if(i<paths.length) img.src=paths[i]; };
+  img.src = paths[i];
+}
+
+/* Рендер: создаём ровно один раз сетку и дальше обновляем только меняющиеся клетки */
+function buildDOM(){
+  board.style.gridTemplateColumns = `repeat(${N}, var(--tile))`;
+  board.innerHTML = '';
+  for(let r=0;r<N;r++){
+    for(let c=0;c<N;c++){
+      const cell = document.createElement('div'); cell.className='cell';
+      const tile = document.createElement('div'); tile.className='tile'; tile.dataset.r=r; tile.dataset.c=c;
+      const img = document.createElement('img'); tile.appendChild(img);
+      cell.appendChild(tile); board.appendChild(cell);
+    }
+  }
+}
+function renderCell(r,c){
+  const idx = r*N + c;
+  const tile = board.children[idx].firstChild;
+  const data = grid[r][c];
+  tile.classList.toggle('selected', !!sel && sel.r===r && sel.c===c);
+  tile.style.borderColor = data ? borderFor(data.type, data.star) : 'transparent';
+  const img = tile.firstChild;
+  if(!data){ img.removeAttribute('src'); return; }
+  if(data.star) setImgFallback(img, 'bonus', true);
+  else setImgFallback(img, String(data.type), false);
+}
+function renderHUD(){
+  scoreEl.textContent = score;
+  movesEl.textContent = moves;
+  starCountEl.textContent = stars;
+  starBtn.classList.toggle('active', starArmed);
+}
+
+/* Модель поля */
+function randomTile(){ return {type: TYPES[rand(TYPES.length)], star:false}; }
+function snapshot(){ snapshotState = JSON.stringify({grid, score, moves, stars}); }
+function restore(){ if(!snapshotState) return; const s=JSON.parse(snapshotState); grid=s.grid; score=s.score; moves=s.moves; stars=s.stars; sel=null; starArmed=false; renderAll(); }
+function renderAll(){ for(let r=0;r<N;r++) for(let c=0;c<N;c++) renderCell(r,c); renderHUD(); }
+
+function initGrid(){
+  grid = Array.from({length:N}, ()=> Array.from({length:N}, randomTile));
+  // убираем стартовые матчи
+  while(findMatches().length) shuffleBoard();
+}
+
+function shuffleBoard(){
+  const list=[]; for(let r=0;r<N;r++) for(let c=0;c<N;c++) list.push(grid[r][c]);
+  for(let i=list.length-1;i>0;i--){ const j=rand(i+1); [list[i],list[j]]=[list[j],list[i]]; }
+  let k=0; for(let r=0;r<N;r++) for(let c=0;c<N;c++){ grid[r][c]=list[k++]; }
+}
+
+/* Поиск матчей >=3 — возвращает массив групп позиций */
+function findMatches(){
+  const out=[];
+  // строки
+  for(let r=0;r<N;r++){
+    let run=1;
+    for(let c=1;c<=N;c++){
+      const prev=grid[r][c-1], cur=(c<N?grid[r][c]:null);
+      if(cur && prev && !prev.star && !cur.star && prev.type===cur.type) run++;
+      else { if(run>=3) out.push(Array.from({length:run}, (_,i)=>({r, c:c-1-i}))); run=1; }
+    }
+  }
+  // столбцы
+  for(let c=0;c<N;c++){
+    let run=1;
+    for(let r=1;r<=N;r++){
+      const prev=grid[r-1][c], cur=(r<N?grid[r][c]:null);
+      if(cur && prev && !prev.star && !cur.star && prev.type===cur.type) run++;
+      else { if(run>=3) out.push(Array.from({length:run}, (_,i)=>({r:r-1-i, c}))); run=1; }
+    }
+  }
+  return out;
+}
+
+/* Уничтожение и доливка — быстрый вариант, без тяжёлых анимаций */
+async function crush(matches, {awardStars=true}={}){
+  if(!matches.length) return false;
+
+  // награды за длину матчей (если разрешено)
+  if(awardStars){
+    for(const g of matches){
+      if(g.length===4) { stars += 1; }
+      else if(g.length>=5){ stars += 2; }
+    }
+  }
+
+  // удаляем (null) и считаем очки
+  const seen=new Set(); let removed=0;
+  for(const g of matches){
+    for(const p of g){
+      const key=p.r+','+p.c;
+      if(!seen.has(key)){ seen.add(key); if(grid[p.r][p.c]!=null){ grid[p.r][p.c]=null; removed++; } }
+    }
+  }
+  score += removed * SCORE_PER_TILE;
+
+  // падение вниз + доливка
+  for(let c=0;c<N;c++){
+    let write=N-1;
+    for(let r=N-1;r>=0;r--){
+      if(grid[r][c]!=null){ grid[write][c]=grid[r][c]; if(write!==r) grid[r][c]=null; write--; }
+    }
+    for(let r=write;r>=0;r--){
+      const spawnStar = Math.random() < STAR_REFILL_CHANCE;
+      grid[r][c] = spawnStar ? {type:TYPES[rand(TYPES.length)], star:true} : randomTile();
+    }
+  }
+
+  // ререндер только изменённых: ради простоты — всего поля (дёшево)
+  renderAll();
+
+  // цепочки (звёзды тоже могут вызывать цепочки, но без выдачи звёзд, если awardStars=false)
+  const next = findMatches();
+  if(next.length) return crush(next, {awardStars});
+  return true;
+}
+
+/* Выделение: всегда одна плитка */
+function setSelected(p){
+  const old = sel; sel = p;
+  if(old) renderCell(old.r, old.c);
+  if(p) renderCell(p.r, p.c);
+}
+
+/* Обмен двух клеток */
+async function attemptSwap(a,b){
+  if(!neighbors(a,b)) return;
+  // сбор звезды кликом/перетягиванием
+  if(grid[a.r][a.c]?.star){ stars++; grid[a.r][a.c]=randomTile(); renderCell(a.r,a.c); renderHUD(); toast('⭐ Добавлена'); return; }
+  if(grid[b.r][b.c]?.star){ stars++; grid[b.r][b.c]=randomTile(); renderCell(b.r,b.c); renderHUD(); toast('⭐ Добавлена'); return; }
+
+  snapshot();
+  // быстрый swap
+  const t = grid[a.r][a.c]; grid[a.r][a.c]=grid[b.r][b.c]; grid[b.r][b.c]=t;
+  renderCell(a.r,a.c); renderCell(b.r,b.c);
+
+  const m = findMatches();
+  if(!m.length){
+    // откат
+    const tt = grid[a.r][a.c]; grid[a.r][a.c]=grid[b.r][b.c]; grid[b.r][b.c]=tt;
+    renderCell(a.r,a.c); renderCell(b.r,b.c);
+    setSelected(null);
+    return;
+  }
+  moves++; renderHUD(); setSelected(null);
+  await crush(m, {awardStars:true});
+}
+
+/* Использование звезды на тип */
+function useStarOnType(type){
+  starArmed=false; renderHUD();
+  // убираем все плитки выбранного типа (кроме звёзд)
+  let removed=0;
+  for(let r=0;r<N;r++) for(let c=0;c<N;c++){
+    const t=grid[r][c];
+    if(t && !t.star && t.type===type){ grid[r][c]=null; removed++; }
+  }
+  if(!removed){ toast('Нет подходящих плиток'); return; }
+  score += removed * SCORE_PER_TILE * 2;
+  // при очистке звездой — не выдаём новые звезды ни за группы, ни за цепочки
+  crush(findMatches(), {awardStars:false});
+}
+
+/* === Ввод: клик, драг, тач === */
+board.addEventListener('click', (e)=>{
+  if(suppressClick){ suppressClick=false; return; }
+  const tile = e.target.closest('.tile'); if(!tile) return;
+  const r=+tile.dataset.r, c=+tile.dataset.c;
+  const t = grid[r][c];
+
+  if(starArmed){
+    if(t && !t.star) useStarOnType(t.type);
+    else toast('Выбери обычную плитку');
+    return;
+  }
+
+  if(t && t.star){
+    stars++; grid[r][c]=randomTile(); renderCell(r,c); renderHUD(); toast('⭐ Добавлена');
+    return;
+  }
+
+  if(!sel){ setSelected({r,c}); return; }
+  if(sel.r===r && sel.c===c){ setSelected(null); return; }
+  if(neighbors(sel,{r,c})) attemptSwap(sel,{r,c});
+  else setSelected({r,c});
+});
+
+/* Драг (мышь) */
+board.addEventListener('mousedown',(e)=>{
+  if(starArmed) return;
+  const tile=e.target.closest('.tile'); if(!tile) return;
+  dragging=true; suppressClick=false;
+  dragStart={r:+tile.dataset.r, c:+tile.dataset.c, x:e.clientX, y:e.clientY};
+  setSelected({r:dragStart.r, c:dragStart.c});
+});
+window.addEventListener('mousemove',(e)=>{
+  if(!dragging||!dragStart) return;
+  const dx=e.clientX-dragStart.x, dy=e.clientY-dragStart.y;
+  if(Math.abs(dx)<DRAG_THRESHOLD && Math.abs(dy)<DRAG_THRESHOLD) return;
+  const a={r:dragStart.r,c:dragStart.c};
+  let b=null;
+  if(Math.abs(dx)>Math.abs(dy)){ b={r:a.r, c:a.c+(dx>0?1:-1)}; } else { b={r:a.r+(dy>0?1:-1), c:a.c}; }
+  if(inb(b.r,b.c)){ suppressClick=true; attemptSwap(a,b); }
+  dragging=false; dragStart=null;
+});
+window.addEventListener('mouseup',()=>{ dragging=false; dragStart=null; });
+
+/* Тач */
+board.addEventListener('touchstart',(e)=>{
+  if(starArmed) return;
+  const t=e.changedTouches[0];
+  const tile=e.target.closest('.tile'); if(!tile) return;
+  dragging=true; suppressClick=false;
+  dragStart={r:+tile.dataset.r, c:+tile.dataset.c, x:t.clientX, y:t.clientY};
+  setSelected({r:dragStart.r, c:dragStart.c});
+},{passive:true});
+board.addEventListener('touchmove',(e)=>{
+  if(!dragging||!dragStart) return;
+  const t=e.changedTouches[0], dx=t.clientX-dragStart.x, dy=t.clientY-dragStart.y;
+  if(Math.abs(dx)<DRAG_THRESHOLD && Math.abs(dy)<DRAG_THRESHOLD) return;
+  const a={r:dragStart.r,c:dragStart.c};
+  let b=null;
+  if(Math.abs(dx)>Math.abs(dy)){ b={r:a.r, c:a.c+(dx>0?1:-1)}; } else { b={r:a.r+(dy>0?1:-1), c:a.c}; }
+  if(inb(b.r,b.c)){ suppressClick=true; attemptSwap(a,b); }
+  dragging=false; dragStart=null;
+},{passive:true});
+board.addEventListener('touchend',()=>{ dragging=false; dragStart=null; },{passive:true});
+
+/* Кнопки */
+document.getElementById('newGame').addEventListener('click', ()=>{ newGame(); });
+document.getElementById('rewind').addEventListener('click', ()=>{ restore(); toast('↺ Откат'); });
+starBtn.addEventListener('click', ()=>{
+  if(stars<=0){ toast('Нет звёзд'); return; }
+  stars--; starArmed=true; renderHUD(); toast('⭐ Выбери тип плитки');
+});
+
+/* Жизненный цикл */
+function newGame(){
+  score=0; moves=0; stars=0; starArmed=false; sel=null; snapshotState=null;
+  buildDOM(); initGrid(); renderAll();
+}
+newGame();
+</script>
 </body>
 </html>
