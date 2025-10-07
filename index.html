@@ -4,7 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>raisaliky — Match-3</title>
-  <!-- прелоад картинок -->
+
+  <!-- прелоад ключевых изображений -->
   <link rel="preload" href="1.png" as="image">
   <link rel="preload" href="2.png" as="image">
   <link rel="preload" href="3.png" as="image">
@@ -13,6 +14,7 @@
   <link rel="preload" href="6.png" as="image">
   <link rel="preload" href="bonus.png" as="image">
   <link rel="preload" href="rewind.png" as="image">
+
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -22,7 +24,7 @@
     <aside class="panel glass">
       <h1>🐶 raisaliky — Match-3</h1>
       <p class="subtitle">
-        Соединяй 3+ одинаковых мордочек. Матч из 4 даёт ⭐ (в инвентарь),
+        Перетягивай плитки на соседние клетки, чтобы собрать 3+ подряд. Матч из 4 даёт ⭐ (в инвентарь),
         из 5 — ⭐⭐. Нажми ⭐ → затем на тип плитки — все такие плитки исчезнут.
       </p>
 
@@ -48,7 +50,7 @@
         <button class="btn primary" id="newGame">Новая игра</button>
       </div>
 
-      <div class="note">Подсказка: цепочки-реакции дают +50% очков.</div>
+      <div class="note">Подсказка: цепочки-реакции дают +50% очков. Перетягивание работает и на тач-экранах.</div>
     </aside>
 
     <main class="board-wrap glass">
