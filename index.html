@@ -3,9 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>raisaliky — быстрый Match-3</title>
-
-<!-- Прелоад ключевых картинок -->
+<title>raisaliky — вкусный Match-3</title>
 <link rel="preload" href="1.png" as="image">
 <link rel="preload" href="2.png" as="image">
 <link rel="preload" href="3.png" as="image">
@@ -14,389 +12,837 @@
 <link rel="preload" href="6.png" as="image">
 <link rel="preload" href="bonus.png" as="image">
 <link rel="preload" href="rewind.png" as="image">
-
 <style>
   :root{
-    --bg:#0b1327;
-    --panel:#0e1424cc;
-    --stroke:#243351;
-    --text:#e5e7eb;
-    --muted:#9fb1d6;
-    --tile:72px;       /* размер клетки */
-    --gap:10px;
+    --bg:#05070f;
+    --panel:#101726dd;
+    --panel-light:#151e33;
+    --stroke:#253149;
+    --accent:#9be7ff;
+    --text:#f5f7fb;
+    --muted:#a8b6d8;
+    --tile:76px;
+    --gap:12px;
+    --board-size:calc(var(--tile)*8 + var(--gap)*9);
   }
-  *{box-sizing:border-box}
-  html,body{height:100%}
+  *{box-sizing:border-box;font-family:'Inter',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;}
+  html,body{height:100%;}
   body{
-    margin:0; background:linear-gradient(135deg,#0a1326,#09101f 55%, #070d1a);
-    color:var(--text); font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    display:flex; align-items:center; justify-content:center; padding:16px;
+    margin:0;
+    background:radial-gradient(circle at 15% 15%, #1c2a4d, transparent 50%),
+               radial-gradient(circle at 85% 20%, #243a6b, transparent 55%),
+               radial-gradient(circle at 35% 80%, #13203b, transparent 45%),
+               var(--bg);
+    color:var(--text);
+    display:flex;align-items:center;justify-content:center;
+    padding:18px;
   }
-  .wrap{display:grid; grid-template-columns: 320px auto; gap:16px; width:100%; max-width:1100px}
+  .wrap{
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:center;
+    align-items:flex-start;
+    gap:20px;
+    width:100%;
+    max-width:calc(var(--board-size) + 380px);
+  }
+  main{position:relative;flex:0 0 auto;}
   .panel{
-    padding:16px; border:1px solid var(--stroke); border-radius:16px; background:var(--panel);
+    flex:1 1 320px;
+    max-width:360px;
+    min-width:280px;
+    background:var(--panel);
+    border:1px solid rgba(155,231,255,.2);
+    box-shadow:0 25px 45px rgba(0,0,0,.45);
+    padding:24px;
+    border-radius:22px;
+    backdrop-filter:blur(18px);
+    display:flex;
+    flex-direction:column;
+    gap:20px;
   }
-  h1{margin:0 0 6px; font-size:22px}
-  .subtitle{margin:0 0 10px; color:var(--muted); font-size:14px; line-height:1.4}
-  .hud{display:flex; gap:8px; margin:10px 0}
-  .badge{flex:1; display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border:1px solid var(--stroke); border-radius:12px; background:#0d1732}
-  .badge b{font-size:20px}
-  .tools{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
-  .power, .btn{
-    display:inline-flex; align-items:center; gap:8px; border:1px solid var(--stroke); background:#0d1732;
-    color:var(--text); padding:8px 10px; border-radius:10px; cursor:pointer; font-weight:700
+  h1{margin:0;font-size:26px;letter-spacing:0.02em;display:flex;align-items:center;gap:8px;}
+  h1 span{font-size:30px;}
+  .subtitle{margin:0;color:var(--muted);font-size:14px;line-height:1.5;}
+  .hud{
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0,1fr));
+    gap:12px;
   }
-  .power img, .btn img{width:22px; height:22px}
-  .power.active{outline:2px dashed #fbbf24}
-  .note{color:#bfd1f8; font-size:12px; margin-top:8px}
-
-  .board{display:grid; gap:var(--gap); background:rgba(255,255,255,.04); padding:var(--gap); border-radius:16px; border:1px solid var(--stroke)}
-  .cell{width:var(--tile); height:var(--tile); border-radius:12px; display:grid; place-items:center; background:linear-gradient(180deg,#0f1a32,#0b1327)}
+  .stat{
+    background:var(--panel-light);
+    border:1px solid rgba(155,231,255,.22);
+    border-radius:16px;
+    padding:12px 14px;
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    min-height:78px;
+    position:relative;
+    overflow:hidden;
+  }
+  .stat::after{
+    content:"";
+    position:absolute;inset:-40% 50% auto -30%;
+    height:130%;
+    background:linear-gradient(120deg, rgba(155,231,255,.12), rgba(155,231,255,0));
+    transform:skewX(-12deg);
+    pointer-events:none;
+  }
+  .stat__label{font-size:13px;color:var(--muted);}
+  .stat__value{font-size:28px;font-weight:700;display:flex;align-items:center;gap:6px;}
+  .stat__accent{font-size:16px;color:var(--accent);}
+  .progress{
+    background:rgba(11,19,37,.6);
+    border:1px solid rgba(155,231,255,.14);
+    border-radius:999px;
+    height:14px;
+    overflow:hidden;
+    position:relative;
+  }
+  .progress__fill{
+    position:absolute;inset:0;
+    background:linear-gradient(90deg,#48a9ff,#7ef3ff);
+    width:0%;
+    transition:width .35s ease;
+  }
+  .tools{
+    display:flex;flex-wrap:wrap;gap:10px;
+  }
+  button{
+    background:linear-gradient(135deg,#1d2a47,#152036);
+    color:var(--text);
+    border:1px solid rgba(155,231,255,.28);
+    border-radius:14px;
+    padding:10px 16px;
+    font-weight:600;
+    font-size:14px;
+    cursor:pointer;
+    display:inline-flex;
+    gap:8px;
+    align-items:center;
+    transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+  }
+  button:hover:not(:disabled){
+    transform:translateY(-1px);
+    box-shadow:0 10px 25px rgba(0,0,0,.25);
+    border-color:rgba(155,231,255,.45);
+  }
+  button:disabled{opacity:.4;cursor:not-allowed;}
+  .tools__counter{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--muted);padding:0 4px;}
+  .inventory{
+    background:rgba(11,19,37,.65);
+    border:1px solid rgba(155,231,255,.18);
+    border-radius:18px;
+    padding:16px;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
+  .inventory h2{margin:0;font-size:16px;font-weight:600;letter-spacing:0.01em;}
+  .inventory__list{display:flex;flex-wrap:wrap;gap:10px;min-height:54px;}
+  .inventory__hint{margin:0;color:var(--muted);font-size:12px;line-height:1.4;}
+  .inventory__empty{color:var(--muted);font-size:12px;opacity:.75;padding:6px 0;}
+  .inventory__item{
+    width:48px;height:48px;border-radius:14px;
+    border:2px solid transparent;
+    background:rgba(24,34,58,.88);
+    display:grid;place-items:center;
+    cursor:pointer;
+    transition:border-color .2s ease, transform .2s ease;
+  }
+  .inventory__item img{width:32px;height:32px;object-fit:contain;}
+  .inventory__item.active{border-color:#7ef3ff;box-shadow:0 0 0 3px rgba(126,243,255,.18);}
+  .inventory__item:hover{transform:translateY(-1px);}
+  .board{
+    width:var(--board-size);
+    min-width:var(--board-size);
+    min-height:var(--board-size);
+    touch-action:none;
+    display:grid;
+    gap:var(--gap);
+    background:rgba(11,19,37,.55);
+    border:1px solid rgba(155,231,255,.2);
+    border-radius:22px;
+    padding:var(--gap);
+    position:relative;
+    box-shadow:0 20px 40px rgba(0,0,0,.35);
+  }
+  .cell{
+    width:var(--tile);height:var(--tile);
+    border-radius:18px;
+    background:linear-gradient(180deg,rgba(35,50,82,.75),rgba(15,20,35,.95));
+    display:grid;place-items:center;
+  }
   .tile{
-    width:calc(var(--tile) - 8px); height:calc(var(--tile) - 8px);
-    display:grid; place-items:center; border-radius:10px; user-select:none; cursor:pointer;
-    border:4px solid transparent; transition:transform .08s ease, border-color .12s ease;
-    will-change: transform;
+    width:calc(var(--tile) - 10px);
+    height:calc(var(--tile) - 10px);
+    border-radius:16px;
+    display:grid;place-items:center;
+    user-select:none;
+    cursor:pointer;
+    border:5px solid transparent;
+    background:linear-gradient(145deg,rgba(20,29,50,.92),rgba(10,15,30,.95));
+    box-shadow:0 8px 16px rgba(0,0,0,.35);
+    position:relative;
+    --tile-translate:translate3d(0,0,0);
+    --tile-scale:1;
+    transform:var(--tile-translate) scale(var(--tile-scale));
+    transition:box-shadow .18s ease, transform .18s ease, border-color .18s ease;
   }
-  .tile.selected{outline:3px solid #60a5fa}
-  .tile img{width:80%; height:80%; object-fit:contain}
+  .tile img{width:68%;height:68%;object-fit:contain;pointer-events:none;}
+  .tile:hover{box-shadow:0 10px 22px rgba(0,0,0,.4);}
+  .tile.selected{box-shadow:0 0 0 3px rgba(126,243,255,.5) inset, 0 10px 24px rgba(0,0,0,.4);}
+  .tile--active{--tile-scale:1.05;box-shadow:0 16px 26px rgba(0,0,0,.42);}
+  .tile--ghost{opacity:0;}
+  .tile-ghost{
+    position:fixed;
+    z-index:40;
+    border-radius:16px;
+    pointer-events:none;
+    transition:transform .28s cubic-bezier(.22,.61,.36,1);
+    will-change:transform;
+    background:linear-gradient(145deg,rgba(20,29,50,.92),rgba(10,15,30,.95));
+    border:5px solid transparent;
+    box-shadow:0 10px 22px rgba(0,0,0,.45);
+  }
+  .tile-ghost img{width:68%;height:68%;object-fit:contain;}
   .toast{
-    position:fixed; top:12px; left:50%; transform:translateX(-50%); background:#0f162bde; border:1px solid var(--stroke);
-    color:#e5e7eb; padding:8px 10px; border-radius:10px; font-size:13px; opacity:0; pointer-events:none; transition:opacity .2s ease
+    position:fixed;
+    top:18px;left:50%;transform:translateX(-50%);
+    background:rgba(15,22,40,.92);
+    border:1px solid rgba(155,231,255,.25);
+    padding:10px 16px;
+    border-radius:14px;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .25s ease, transform .25s ease;
+    font-size:13px;
+    box-shadow:0 14px 30px rgba(0,0,0,.35);
   }
-  .toast.show{opacity:1}
-
-  @media (max-width: 980px){
-    .wrap{grid-template-columns: 1fr}
-    :root{ --tile:64px }
+  .toast.show{opacity:1;transform:translate(-50%,0);}
+  .overlay{
+    position:absolute;
+    inset:0;
+    background:rgba(5,8,16,.82);
+    border-radius:22px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .3s ease;
+  }
+  .overlay.visible{opacity:1;pointer-events:auto;}
+  .overlay__panel{
+    background:rgba(14,22,39,.95);
+    border:1px solid rgba(155,231,255,.35);
+    padding:32px;
+    border-radius:20px;
+    text-align:center;
+    max-width:320px;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+  }
+  .overlay__panel h3{margin:0;font-size:22px;}
+  .overlay__panel p{margin:0;color:var(--muted);font-size:14px;line-height:1.5;}
+  @media (max-width:1200px){
+    .wrap{max-width:calc(var(--board-size) + 360px);}
+  }
+  @media (max-width:1024px){
+    .wrap{flex-direction:column;align-items:center;max-width:none;}
+    main{order:-1;}
+    .panel{max-width:420px;width:100%;}
+    :root{--tile:70px;--board-size:calc(var(--tile)*8 + var(--gap)*9);}
+  }
+  @media (max-width:620px){
+    body{padding:12px;}
+    :root{--tile:60px;--gap:10px;--board-size:calc(var(--tile)*8 + var(--gap)*9);}
+    .panel{padding:18px;}
+    .hud{grid-template-columns:1fr 1fr;}
   }
 </style>
 </head>
 <body>
-
 <div class="wrap">
-  <section class="panel">
-    <h1>🐶 raisaliky — Match-3</h1>
-    <p class="subtitle">
-      Собирай 3+ подряд. Можно <b>кликнуть</b> по соседним плиткам для обмена или <b>перетянуть</b> на соседнюю.
-      Матч из 4 даёт ⭐, из 5 — ⭐⭐. Нажми ⭐ и кликни по типу плитки — все такие исчезнут.<br>
-      <i>Звезда не порождает новые звезды.</i>
-    </p>
-
-    <div class="hud">
-      <div class="badge"><span>Очки</span><b id="score">0</b></div>
-      <div class="badge"><span>Ходы</span><b id="moves">0</b></div>
-    </div>
-
-    <div class="tools">
-      <button class="power" id="starPower" title="Активировать ⭐">
-        <img src="bonus.png" alt=""><span><b>⭐</b> <span id="starCount">0</span></span>
-      </button>
-      <button class="btn" id="rewind"><img src="rewind.png" alt=""> Rewind</button>
-      <button class="btn" id="newGame">Новая игра</button>
-    </div>
-
-    <div class="note">Совет: если ход не даёт матч — он автоматически откатывается.</div>
-  </section>
-
   <main>
     <div id="board" class="board" aria-label="Поле"></div>
+    <div id="overlay" class="overlay" aria-live="polite">
+      <div class="overlay__panel">
+        <h3>Время вышло!</h3>
+        <p id="overlaySummary">Вы собрали 0 угощений.</p>
+        <button id="overlayRestart">Новая попытка</button>
+      </div>
+    </div>
   </main>
+  <section class="panel">
+    <header>
+      <h1><span>🐾</span> raisaliky</h1>
+      <p class="subtitle">
+        Перетягивай или кликай по соседним плиткам, собирай ряды. За 3 одинаковые плитки подряд — 🥩, за 4 — две, за 5 и более — три.
+        Каждые 10 угощений превращаются в сундук с случайной плиткой. Используй её в нужный момент!
+      </p>
+    </header>
+    <section class="hud">
+      <div class="stat">
+        <span class="stat__label">Угощения 🥩</span>
+        <span class="stat__value"><span id="treats">0</span><span class="stat__accent" id="treatProgressLabel">0 / 10</span></span>
+      </div>
+      <div class="stat">
+        <span class="stat__label">Ходы</span>
+        <span class="stat__value" id="moves">0</span>
+      </div>
+      <div class="stat">
+        <span class="stat__label">Очки</span>
+        <span class="stat__value" id="score">0</span>
+      </div>
+      <div class="stat">
+        <span class="stat__label">Таймер</span>
+        <span class="stat__value"><span id="timer">01:00</span></span>
+      </div>
+    </section>
+    <div class="progress" aria-hidden="true"><div id="progressFill" class="progress__fill"></div></div>
+    <div class="tools">
+      <button id="openChest" type="button">🎁 Открыть сундук</button>
+      <div class="tools__counter">Сундуки: <strong id="chestCount">0</strong></div>
+      <button id="rewind" type="button">↺ Откат</button>
+      <button id="newGame" type="button">Новая игра</button>
+    </div>
+    <section class="inventory">
+      <h2>Инвентарь плиток</h2>
+      <div id="inventoryList" class="inventory__list" role="list"></div>
+      <p class="inventory__hint">Открой сундук, чтобы получить плитку. Кликни по плитке в инвентаре, затем по клетке на поле, чтобы заменить её.</p>
+    </section>
+  </section>
 </div>
-
-<div id="toast" class="toast">Подсказка</div>
-
+<div id="toast" class="toast" role="status" aria-live="polite">Подсказка</div>
 <script>
-/* ================== Быстрый, однофайловый движок ================== */
-/* Конфиг */
-const N = 8;                       // поле N x N
-const TYPES = [1,2,3,4,5,6];       // соответствуют 1.png … 6.png
+const N = 8;
+const TYPES = [1,2,3,4,5,6];
 const SCORE_PER_TILE = 10;
-const STAR_REFILL_CHANCE = 0.00;   // шанс выпадения звезды при доливке (для скорости отключил)
 const DRAG_THRESHOLD = 14;
+const GAME_TIME = 60;
 
-/* Состояние */
-let grid = [];                     // {type:number, star:boolean} | null
-let score=0, moves=0;
-let stars=0;
-let starArmed=false;
-let sel=null;                      // {r,c}
-let snapshotState=null;            // для rewind
-let dragging=false, dragStart=null, suppressClick=false;
-let awardStarsEnabled = true;      // флаг — когда используем ⭐, выключаем награждение звёздами
+let grid = [];
+let score = 0;
+let moves = 0;
+let treats = 0;
+let treatProgress = 0;
+let chests = 0;
+let inventory = [];
+let selected = null;
+let selectedInventoryIndex = null;
+let snapshotState = null;
+let dragging = false;
+let dragInfo = null;
+let suppressClick = false;
+let boardLocked = false;
+let gameOver = false;
+let timerId = null;
+let timeLeft = GAME_TIME;
 
-/* DOM */
 const board = document.getElementById('board');
+const toastEl = document.getElementById('toast');
 const scoreEl = document.getElementById('score');
 const movesEl = document.getElementById('moves');
-const starCountEl = document.getElementById('starCount');
-const starBtn = document.getElementById('starPower');
-const toastEl = document.getElementById('toast');
+const treatsEl = document.getElementById('treats');
+const treatProgressLabel = document.getElementById('treatProgressLabel');
+const progressFill = document.getElementById('progressFill');
+const chestCountEl = document.getElementById('chestCount');
+const inventoryList = document.getElementById('inventoryList');
+const timerEl = document.getElementById('timer');
+const overlay = document.getElementById('overlay');
+const overlaySummary = document.getElementById('overlaySummary');
+const overlayRestart = document.getElementById('overlayRestart');
 
-/* Утилиты */
+function toast(msg, ms=1600){
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  setTimeout(()=>toastEl.classList.remove('show'), ms);
+}
 const rand = n => Math.floor(Math.random()*n);
 const delay = ms => new Promise(r=>setTimeout(r,ms));
-function toast(msg, ms=1100){ toastEl.textContent=msg; toastEl.classList.add('show'); setTimeout(()=>toastEl.classList.remove('show'), ms); }
 function inb(r,c){ return r>=0 && c>=0 && r<N && c<N; }
 function neighbors(a,b){ return (a.r===b.r && Math.abs(a.c-b.c)===1) || (a.c===b.c && Math.abs(a.r-b.r)===1); }
 
-/* Цвет рамки по типу */
-function borderFor(t, star=false){
-  if(star) return '#fbbf24';
-  return ({1:'#60a5fa',2:'#34d399',3:'#f59e0b',4:'#f87171',5:'#a78bfa',6:'#22d3ee'})[t] || '#cbd5e1';
+function borderFor(type){
+  const colors = {
+    1:'#6aa4ff',
+    2:'#3bd88f',
+    3:'#ffbf5e',
+    4:'#ff6a7a',
+    5:'#b28bff',
+    6:'#3ce8ff'
+  };
+  return colors[type] || '#d1d9ff';
 }
-
-/* Изображения: учитываем .png / .PNG / .Png */
 function candidatePaths(base){
   return [`${base}.png`, `${base}.PNG`, `${base}.Png`];
 }
-function setImgFallback(img, base, isStar=false){
-  const paths = isStar ? ['bonus.png','bonus.PNG','bonus.Png'] : candidatePaths(base);
-  let i=0;
-  img.onerror = ()=>{ i++; if(i<paths.length) img.src=paths[i]; };
+function setImgFallback(img, base){
+  const paths = candidatePaths(base);
+  let i = 0;
+  img.onerror = ()=>{ i++; if(i < paths.length) img.src = paths[i]; };
   img.src = paths[i];
 }
-
-/* Рендер: создаём ровно один раз сетку и дальше обновляем только меняющиеся клетки */
 function buildDOM(){
   board.style.gridTemplateColumns = `repeat(${N}, var(--tile))`;
   board.innerHTML = '';
   for(let r=0;r<N;r++){
     for(let c=0;c<N;c++){
-      const cell = document.createElement('div'); cell.className='cell';
-      const tile = document.createElement('div'); tile.className='tile'; tile.dataset.r=r; tile.dataset.c=c;
-      const img = document.createElement('img'); tile.appendChild(img);
-      cell.appendChild(tile); board.appendChild(cell);
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      const tile = document.createElement('div');
+      tile.className = 'tile';
+      tile.dataset.r = r;
+      tile.dataset.c = c;
+      const img = document.createElement('img');
+      tile.appendChild(img);
+      cell.appendChild(tile);
+      board.appendChild(cell);
     }
   }
 }
 function renderCell(r,c){
-  const idx = r*N + c;
-  const tile = board.children[idx].firstChild;
+  const tile = board.children[r*N + c].firstChild;
+  tile.classList.toggle('selected', !!selected && selected.r===r && selected.c===c);
   const data = grid[r][c];
-  tile.classList.toggle('selected', !!sel && sel.r===r && sel.c===c);
-  tile.style.borderColor = data ? borderFor(data.type, data.star) : 'transparent';
-  const img = tile.firstChild;
-  if(!data){ img.removeAttribute('src'); return; }
-  if(data.star) setImgFallback(img, 'bonus', true);
-  else setImgFallback(img, String(data.type), false);
+  if(!data){
+    tile.firstChild.removeAttribute('src');
+    tile.style.borderColor = 'transparent';
+    return;
+  }
+  setImgFallback(tile.firstChild, String(data.type));
+  tile.style.borderColor = borderFor(data.type);
+}
+function renderAll(){
+  for(let r=0;r<N;r++) for(let c=0;c<N;c++) renderCell(r,c);
 }
 function renderHUD(){
   scoreEl.textContent = score;
   movesEl.textContent = moves;
-  starCountEl.textContent = stars;
-  starBtn.classList.toggle('active', starArmed);
+  treatsEl.textContent = treats;
+  chestCountEl.textContent = chests;
+  treatProgressLabel.textContent = `${treatProgress} / 10`;
+  progressFill.style.width = `${(treatProgress/10)*100}%`;
 }
-
-/* Модель поля */
-function randomTile(){ return {type: TYPES[rand(TYPES.length)], star:false}; }
-function snapshot(){ snapshotState = JSON.stringify({grid, score, moves, stars}); }
-function restore(){ if(!snapshotState) return; const s=JSON.parse(snapshotState); grid=s.grid; score=s.score; moves=s.moves; stars=s.stars; sel=null; starArmed=false; renderAll(); }
-function renderAll(){ for(let r=0;r<N;r++) for(let c=0;c<N;c++) renderCell(r,c); renderHUD(); }
-
+function updateTimerUI(){
+  const m = Math.floor(timeLeft/60);
+  const s = timeLeft%60;
+  timerEl.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+function updateInventoryUI(){
+  inventoryList.innerHTML = '';
+  if(!inventory.length){
+    const placeholder = document.createElement('div');
+    placeholder.className = 'inventory__empty';
+    placeholder.textContent = 'Пока здесь пусто.';
+    inventoryList.appendChild(placeholder);
+    return;
+  }
+  inventory.forEach((type, idx)=>{
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'inventory__item';
+    item.setAttribute('role','listitem');
+    if(selectedInventoryIndex === idx) item.classList.add('active');
+    const img = document.createElement('img');
+    setImgFallback(img, String(type));
+    item.appendChild(img);
+    item.addEventListener('click', ()=>{
+      if(selectedInventoryIndex === idx){
+        selectedInventoryIndex = null;
+      } else {
+        selectedInventoryIndex = idx;
+      }
+      updateInventoryUI();
+      if(selectedInventoryIndex !== null){
+        toast('Выберите клетку на поле для замены');
+      }
+    });
+    inventoryList.appendChild(item);
+  });
+}
+function randomTile(){
+  return {type: TYPES[rand(TYPES.length)]};
+}
 function initGrid(){
   grid = Array.from({length:N}, ()=> Array.from({length:N}, randomTile));
-  // убираем стартовые матчи
   while(findMatches().length) shuffleBoard();
 }
-
 function shuffleBoard(){
-  const list=[]; for(let r=0;r<N;r++) for(let c=0;c<N;c++) list.push(grid[r][c]);
+  const list=[];
+  for(let r=0;r<N;r++) for(let c=0;c<N;c++) list.push(grid[r][c]);
   for(let i=list.length-1;i>0;i--){ const j=rand(i+1); [list[i],list[j]]=[list[j],list[i]]; }
-  let k=0; for(let r=0;r<N;r++) for(let c=0;c<N;c++){ grid[r][c]=list[k++]; }
+  let k=0;
+  for(let r=0;r<N;r++) for(let c=0;c<N;c++) grid[r][c]=list[k++];
 }
-
-/* Поиск матчей >=3 — возвращает массив групп позиций */
+function snapshot(){
+  snapshotState = JSON.stringify({grid, score, moves, treats, treatProgress, chests, inventory});
+}
+function restore(){
+  if(!snapshotState || boardLocked) return;
+  const s = JSON.parse(snapshotState);
+  grid = s.grid;
+  score = s.score;
+  moves = s.moves;
+  treats = s.treats;
+  treatProgress = s.treatProgress;
+  chests = s.chests;
+  inventory = s.inventory;
+  selected = null;
+  selectedInventoryIndex = null;
+  renderAll();
+  renderHUD();
+  updateInventoryUI();
+  toast('↺ Возврат хода');
+}
 function findMatches(){
   const out=[];
-  // строки
   for(let r=0;r<N;r++){
     let run=1;
     for(let c=1;c<=N;c++){
-      const prev=grid[r][c-1], cur=(c<N?grid[r][c]:null);
-      if(cur && prev && !prev.star && !cur.star && prev.type===cur.type) run++;
-      else { if(run>=3) out.push(Array.from({length:run}, (_,i)=>({r, c:c-1-i}))); run=1; }
+      const prev=grid[r][c-1];
+      const cur=(c<N?grid[r][c]:null);
+      if(cur && prev && prev.type===cur.type){ run++; }
+      else {
+        if(run>=3){ out.push(Array.from({length:run},(_,i)=>({r, c:c-1-i}))); }
+        run=1;
+      }
     }
   }
-  // столбцы
   for(let c=0;c<N;c++){
     let run=1;
     for(let r=1;r<=N;r++){
-      const prev=grid[r-1][c], cur=(r<N?grid[r][c]:null);
-      if(cur && prev && !prev.star && !cur.star && prev.type===cur.type) run++;
-      else { if(run>=3) out.push(Array.from({length:run}, (_,i)=>({r:r-1-i, c}))); run=1; }
+      const prev=grid[r-1][c];
+      const cur=(r<N?grid[r][c]:null);
+      if(cur && prev && prev.type===cur.type){ run++; }
+      else {
+        if(run>=3){ out.push(Array.from({length:run},(_,i)=>({r:r-1-i, c}))); }
+        run=1;
+      }
     }
   }
   return out;
 }
-
-/* Уничтожение и доливка — быстрый вариант, без тяжёлых анимаций */
-async function crush(matches, {awardStars=true}={}){
-  if(!matches.length) return false;
-
-  // награды за длину матчей (если разрешено)
-  if(awardStars){
-    for(const g of matches){
-      if(g.length===4) { stars += 1; }
-      else if(g.length>=5){ stars += 2; }
-    }
+function addTreats(amount){
+  if(amount<=0) return;
+  treats += amount;
+  treatProgress += amount;
+  while(treatProgress >= 10){
+    treatProgress -= 10;
+    chests++;
+    toast('🎁 Получен сундук!');
   }
-
-  // удаляем (null) и считаем очки
-  const seen=new Set(); let removed=0;
-  for(const g of matches){
-    for(const p of g){
-      const key=p.r+','+p.c;
-      if(!seen.has(key)){ seen.add(key); if(grid[p.r][p.c]!=null){ grid[p.r][p.c]=null; removed++; } }
+}
+async function crush(matches){
+  if(!matches.length) return false;
+  const seen = new Set();
+  let removed = 0;
+  for(const group of matches){
+    if(group.length===3) addTreats(1);
+    else if(group.length===4) addTreats(2);
+    else if(group.length>=5) addTreats(3);
+    for(const p of group){
+      const key = `${p.r},${p.c}`;
+      if(!seen.has(key)){
+        seen.add(key);
+        if(grid[p.r][p.c]){
+          grid[p.r][p.c] = null;
+          removed++;
+        }
+      }
     }
   }
   score += removed * SCORE_PER_TILE;
-
-  // падение вниз + доливка
-  for(let c=0;c<N;c++){
-    let write=N-1;
-    for(let r=N-1;r>=0;r--){
-      if(grid[r][c]!=null){ grid[write][c]=grid[r][c]; if(write!==r) grid[r][c]=null; write--; }
-    }
-    for(let r=write;r>=0;r--){
-      const spawnStar = Math.random() < STAR_REFILL_CHANCE;
-      grid[r][c] = spawnStar ? {type:TYPES[rand(TYPES.length)], star:true} : randomTile();
-    }
-  }
-
-  // ререндер только изменённых: ради простоты — всего поля (дёшево)
+  renderHUD();
+  await collapseAndRefill();
   renderAll();
-
-  // цепочки (звёзды тоже могут вызывать цепочки, но без выдачи звёзд, если awardStars=false)
-  const next = findMatches();
-  if(next.length) return crush(next, {awardStars});
+  const cascade = findMatches();
+  if(cascade.length) await crush(cascade);
   return true;
 }
-
-/* Выделение: всегда одна плитка */
+async function collapseAndRefill(){
+  for(let c=0;c<N;c++){
+    let write = N-1;
+    for(let r=N-1;r>=0;r--){
+      if(grid[r][c]){
+        grid[write][c] = grid[r][c];
+        if(write!==r) grid[r][c]=null;
+        write--;
+      }
+    }
+    for(let r=write;r>=0;r--){
+      grid[r][c] = randomTile();
+    }
+  }
+}
 function setSelected(p){
-  const old = sel; sel = p;
-  if(old) renderCell(old.r, old.c);
+  const prev = selected;
+  selected = p;
+  if(prev) renderCell(prev.r, prev.c);
   if(p) renderCell(p.r, p.c);
 }
-
-/* Обмен двух клеток */
+function getTileEl(pos){
+  return board.children[pos.r*N + pos.c].firstChild;
+}
+function releaseDraggedTile(tile,{snap=false}={}){
+  if(!tile) return;
+  tile.classList.remove('tile--active');
+  if(snap){
+    tile.style.transition = '';
+    tile.style.removeProperty('--tile-translate');
+    return;
+  }
+  tile.style.transition = 'transform .22s cubic-bezier(.22,.61,.36,1)';
+  tile.style.setProperty('--tile-translate','translate3d(0,0,0)');
+  const handle = (e)=>{
+    if(e.propertyName !== 'transform') return;
+    tile.style.transition = '';
+    tile.style.removeProperty('--tile-translate');
+    tile.removeEventListener('transitionend', handle);
+  };
+  tile.addEventListener('transitionend', handle);
+}
+function animateSwap(a,b,{onArrive}={}){
+  return new Promise(resolve=>{
+    const tileA = getTileEl(a);
+    const tileB = getTileEl(b);
+    releaseDraggedTile(tileA,{snap:true});
+    releaseDraggedTile(tileB,{snap:true});
+    const rectA = tileA.getBoundingClientRect();
+    const rectB = tileB.getBoundingClientRect();
+    const ghostA = tileA.cloneNode(true);
+    const ghostB = tileB.cloneNode(true);
+    ghostA.classList.add('tile-ghost');
+    ghostB.classList.add('tile-ghost');
+    const styleA = getComputedStyle(tileA);
+    const styleB = getComputedStyle(tileB);
+    ghostA.style.width = rectA.width+'px';
+    ghostA.style.height = rectA.height+'px';
+    ghostB.style.width = rectB.width+'px';
+    ghostB.style.height = rectB.height+'px';
+    ghostA.style.left = rectA.left+'px';
+    ghostA.style.top = rectA.top+'px';
+    ghostB.style.left = rectB.left+'px';
+    ghostB.style.top = rectB.top+'px';
+    ghostA.style.borderColor = styleA.borderColor;
+    ghostB.style.borderColor = styleB.borderColor;
+    ghostA.style.boxShadow = styleA.boxShadow;
+    ghostB.style.boxShadow = styleB.boxShadow;
+    ghostA.style.transform = 'translate3d(0,0,0)';
+    ghostB.style.transform = 'translate3d(0,0,0)';
+    tileA.classList.add('tile--ghost');
+    tileB.classList.add('tile--ghost');
+    document.body.appendChild(ghostA);
+    document.body.appendChild(ghostB);
+    const dx = rectB.left - rectA.left;
+    const dy = rectB.top - rectA.top;
+    requestAnimationFrame(()=>{
+      ghostA.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
+      ghostB.style.transform = `translate3d(${-dx}px, ${-dy}px, 0)`;
+    });
+    const finish = (e)=>{
+      if(e.propertyName !== 'transform') return;
+      ghostA.removeEventListener('transitionend', finish);
+      if(onArrive) onArrive();
+      ghostA.remove();
+      ghostB.remove();
+      tileA.classList.remove('tile--ghost');
+      tileB.classList.remove('tile--ghost');
+      resolve();
+    };
+    ghostA.addEventListener('transitionend', finish);
+  });
+}
+function performSwap(a,b){
+  const temp = grid[a.r][a.c];
+  grid[a.r][a.c] = grid[b.r][b.c];
+  grid[b.r][b.c] = temp;
+  renderCell(a.r,a.c);
+  renderCell(b.r,b.c);
+}
 async function attemptSwap(a,b){
-  if(!neighbors(a,b)) return;
-  // сбор звезды кликом/перетягиванием
-  if(grid[a.r][a.c]?.star){ stars++; grid[a.r][a.c]=randomTile(); renderCell(a.r,a.c); renderHUD(); toast('⭐ Добавлена'); return; }
-  if(grid[b.r][b.c]?.star){ stars++; grid[b.r][b.c]=randomTile(); renderCell(b.r,b.c); renderHUD(); toast('⭐ Добавлена'); return; }
-
+  if(!neighbors(a,b) || boardLocked || gameOver) return;
   snapshot();
-  // быстрый swap
-  const t = grid[a.r][a.c]; grid[a.r][a.c]=grid[b.r][b.c]; grid[b.r][b.c]=t;
-  renderCell(a.r,a.c); renderCell(b.r,b.c);
-
-  const m = findMatches();
-  if(!m.length){
-    // откат
-    const tt = grid[a.r][a.c]; grid[a.r][a.c]=grid[b.r][b.c]; grid[b.r][b.c]=tt;
-    renderCell(a.r,a.c); renderCell(b.r,b.c);
+  boardLocked = true;
+  try{
+    await animateSwap(a,b,{onArrive:()=>{ performSwap(a,b); }});
+    moves++;
+    renderHUD();
     setSelected(null);
-    return;
+    const matches = findMatches();
+    if(matches.length){
+      await crush(matches);
+    }
+  } finally {
+    boardLocked = false;
+    suppressClick = true;
   }
-  moves++; renderHUD(); setSelected(null);
-  await crush(m, {awardStars:true});
 }
-
-/* Использование звезды на тип */
-function useStarOnType(type){
-  starArmed=false; renderHUD();
-  // убираем все плитки выбранного типа (кроме звёзд)
-  let removed=0;
-  for(let r=0;r<N;r++) for(let c=0;c<N;c++){
-    const t=grid[r][c];
-    if(t && !t.star && t.type===type){ grid[r][c]=null; removed++; }
+function tryUseInventoryOn(r,c){
+  if(selectedInventoryIndex===null || boardLocked || gameOver) return false;
+  snapshot();
+  const type = inventory[selectedInventoryIndex];
+  inventory.splice(selectedInventoryIndex,1);
+  selectedInventoryIndex = null;
+  grid[r][c] = {type};
+  updateInventoryUI();
+  renderCell(r,c);
+  setSelected(null);
+  const matches = findMatches();
+  if(matches.length){
+    boardLocked = true;
+    crush(matches).then(()=>{ boardLocked=false; });
   }
-  if(!removed){ toast('Нет подходящих плиток'); return; }
-  score += removed * SCORE_PER_TILE * 2;
-  // при очистке звездой — не выдаём новые звезды ни за группы, ни за цепочки
-  crush(findMatches(), {awardStars:false});
+  renderHUD();
+  return true;
 }
-
-/* === Ввод: клик, драг, тач === */
-board.addEventListener('click', (e)=>{
-  if(suppressClick){ suppressClick=false; return; }
-  const tile = e.target.closest('.tile'); if(!tile) return;
-  const r=+tile.dataset.r, c=+tile.dataset.c;
-  const t = grid[r][c];
-
-  if(starArmed){
-    if(t && !t.star) useStarOnType(t.type);
-    else toast('Выбери обычную плитку');
-    return;
-  }
-
-  if(t && t.star){
-    stars++; grid[r][c]=randomTile(); renderCell(r,c); renderHUD(); toast('⭐ Добавлена');
-    return;
-  }
-
-  if(!sel){ setSelected({r,c}); return; }
-  if(sel.r===r && sel.c===c){ setSelected(null); return; }
-  if(neighbors(sel,{r,c})) attemptSwap(sel,{r,c});
-  else setSelected({r,c});
-});
-
-/* Драг (мышь) */
-board.addEventListener('mousedown',(e)=>{
-  if(starArmed) return;
-  const tile=e.target.closest('.tile'); if(!tile) return;
-  dragging=true; suppressClick=false;
-  dragStart={r:+tile.dataset.r, c:+tile.dataset.c, x:e.clientX, y:e.clientY};
-  setSelected({r:dragStart.r, c:dragStart.c});
-});
-window.addEventListener('mousemove',(e)=>{
-  if(!dragging||!dragStart) return;
-  const dx=e.clientX-dragStart.x, dy=e.clientY-dragStart.y;
-  if(Math.abs(dx)<DRAG_THRESHOLD && Math.abs(dy)<DRAG_THRESHOLD) return;
-  const a={r:dragStart.r,c:dragStart.c};
-  let b=null;
-  if(Math.abs(dx)>Math.abs(dy)){ b={r:a.r, c:a.c+(dx>0?1:-1)}; } else { b={r:a.r+(dy>0?1:-1), c:a.c}; }
-  if(inb(b.r,b.c)){ suppressClick=true; attemptSwap(a,b); }
-  dragging=false; dragStart=null;
-});
-window.addEventListener('mouseup',()=>{ dragging=false; dragStart=null; });
-
-/* Тач */
-board.addEventListener('touchstart',(e)=>{
-  if(starArmed) return;
-  const t=e.changedTouches[0];
-  const tile=e.target.closest('.tile'); if(!tile) return;
-  dragging=true; suppressClick=false;
-  dragStart={r:+tile.dataset.r, c:+tile.dataset.c, x:t.clientX, y:t.clientY};
-  setSelected({r:dragStart.r, c:dragStart.c});
-},{passive:true});
-board.addEventListener('touchmove',(e)=>{
-  if(!dragging||!dragStart) return;
-  const t=e.changedTouches[0], dx=t.clientX-dragStart.x, dy=t.clientY-dragStart.y;
-  if(Math.abs(dx)<DRAG_THRESHOLD && Math.abs(dy)<DRAG_THRESHOLD) return;
-  const a={r:dragStart.r,c:dragStart.c};
-  let b=null;
-  if(Math.abs(dx)>Math.abs(dy)){ b={r:a.r, c:a.c+(dx>0?1:-1)}; } else { b={r:a.r+(dy>0?1:-1), c:a.c}; }
-  if(inb(b.r,b.c)){ suppressClick=true; attemptSwap(a,b); }
-  dragging=false; dragStart=null;
-},{passive:true});
-board.addEventListener('touchend',()=>{ dragging=false; dragStart=null; },{passive:true});
-
-/* Кнопки */
-document.getElementById('newGame').addEventListener('click', ()=>{ newGame(); });
-document.getElementById('rewind').addEventListener('click', ()=>{ restore(); toast('↺ Откат'); });
-starBtn.addEventListener('click', ()=>{
-  if(stars<=0){ toast('Нет звёзд'); return; }
-  stars--; starArmed=true; renderHUD(); toast('⭐ Выбери тип плитки');
-});
-
-/* Жизненный цикл */
+function startTimer(){
+  clearInterval(timerId);
+  timeLeft = GAME_TIME;
+  updateTimerUI();
+  timerId = setInterval(()=>{
+    if(timeLeft<=0){
+      clearInterval(timerId);
+      endGame();
+      return;
+    }
+    timeLeft--;
+    updateTimerUI();
+    if(timeLeft<=0){
+      clearInterval(timerId);
+      endGame();
+    }
+  },1000);
+}
+function endGame(){
+  gameOver = true;
+  overlay.classList.add('visible');
+  overlaySummary.textContent = `Вы собрали ${treats} угощений.`;
+}
+function closeOverlay(){
+  overlay.classList.remove('visible');
+}
 function newGame(){
-  score=0; moves=0; stars=0; starArmed=false; sel=null; snapshotState=null;
-  buildDOM(); initGrid(); renderAll();
+  closeOverlay();
+  gameOver = false;
+  boardLocked = false;
+  score = 0;
+  moves = 0;
+  treats = 0;
+  treatProgress = 0;
+  chests = 0;
+  inventory = [];
+  selectedInventoryIndex = null;
+  selected = null;
+  snapshotState = null;
+  buildDOM();
+  initGrid();
+  renderAll();
+  renderHUD();
+  updateInventoryUI();
+  startTimer();
 }
+
+board.addEventListener('click',(e)=>{
+  if(gameOver || boardLocked) return;
+  if(suppressClick){ suppressClick=false; return; }
+  const tile = e.target.closest('.tile');
+  if(!tile) return;
+  const r = +tile.dataset.r;
+  const c = +tile.dataset.c;
+  if(tryUseInventoryOn(r,c)) return;
+  if(!selected){ setSelected({r,c}); return; }
+  if(selected.r===r && selected.c===c){ setSelected(null); return; }
+  if(neighbors(selected,{r,c})){
+    attemptSwap(selected,{r,c});
+  } else {
+    setSelected({r,c});
+  }
+});
+let activePointer = null;
+board.addEventListener('pointerdown',(e)=>{
+  if(gameOver || boardLocked || selectedInventoryIndex!==null) return;
+  const tile = e.target.closest('.tile');
+  if(!tile) return;
+  activePointer = e.pointerId;
+  board.setPointerCapture(activePointer);
+  dragging = true;
+  suppressClick = false;
+  dragInfo = {r:+tile.dataset.r, c:+tile.dataset.c, x:e.clientX, y:e.clientY, tile};
+  tile.classList.add('tile--active');
+  tile.style.transition = 'transform 0s';
+  tile.style.setProperty('--tile-translate','translate3d(0,0,0)');
+  setSelected({r:dragInfo.r, c:dragInfo.c});
+});
+board.addEventListener('pointermove',(e)=>{
+  if(!dragging || activePointer!==e.pointerId || !dragInfo) return;
+  const dx = e.clientX - dragInfo.x;
+  const dy = e.clientY - dragInfo.y;
+  if(dragInfo.tile){
+    dragInfo.tile.style.setProperty('--tile-translate', `translate3d(${dx}px, ${dy}px, 0)`);
+  }
+  if(Math.abs(dx)<DRAG_THRESHOLD && Math.abs(dy)<DRAG_THRESHOLD) return;
+  const origin = {r:dragInfo.r, c:dragInfo.c};
+  let target = null;
+  if(Math.abs(dx) > Math.abs(dy)){
+    target = {r:origin.r, c:origin.c + (dx>0?1:-1)};
+  } else {
+    target = {r:origin.r + (dy>0?1:-1), c:origin.c};
+  }
+  if(target && inb(target.r,target.c)){
+    if(dragInfo.tile){
+      releaseDraggedTile(dragInfo.tile,{snap:true});
+    }
+    dragging = false;
+    dragInfo = null;
+    suppressClick = true;
+    board.releasePointerCapture(activePointer);
+    activePointer = null;
+    attemptSwap(origin, target);
+  }
+});
+board.addEventListener('pointerup',(e)=>{
+  if(activePointer === e.pointerId){
+    board.releasePointerCapture(activePointer);
+  }
+  if(dragInfo && dragInfo.tile){
+    releaseDraggedTile(dragInfo.tile);
+  }
+  activePointer = null;
+  dragging = false;
+  dragInfo = null;
+});
+board.addEventListener('pointercancel',()=>{
+  if(activePointer!==null) board.releasePointerCapture(activePointer);
+  if(dragInfo && dragInfo.tile){
+    releaseDraggedTile(dragInfo.tile);
+  }
+  activePointer=null;
+  dragging=false;
+  dragInfo=null;
+});
+
+document.getElementById('newGame').addEventListener('click',()=>{ newGame(); });
+document.getElementById('rewind').addEventListener('click',()=>{ restore(); });
+document.getElementById('openChest').addEventListener('click',()=>{
+  if(gameOver) return;
+  if(chests<=0){ toast('Нет доступных сундуков'); return; }
+  snapshot();
+  chests--;
+  const type = TYPES[rand(TYPES.length)];
+  inventory.push(type);
+  renderHUD();
+  updateInventoryUI();
+  toast('Сундук открыт! Новая плитка добавлена в инвентарь.');
+});
+overlayRestart.addEventListener('click',()=>{ newGame(); });
+overlay.addEventListener('click',(e)=>{
+  if(e.target===overlay) newGame();
+});
+
 newGame();
 </script>
 </body>
